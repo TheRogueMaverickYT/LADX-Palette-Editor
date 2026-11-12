@@ -88,9 +88,18 @@ nav .cat small{color:var(--dim)}nav .cat .ed{color:var(--warn)}
 #content.maps{padding:0;overflow:hidden}
 .mapbar{display:flex;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
 .mapbar label{color:var(--dim);font-size:12px;display:flex;gap:5px;align-items:center}
+.mapbar label.btn{color:var(--text);font-size:13px}
 .mapbar select{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:4px}
 #mapscroll{flex:1;overflow:auto;min-height:0;background:#0d0d10}
 #mapcanvas{display:block;image-rendering:pixelated;cursor:crosshair}
+#gfxview{display:flex;flex-direction:column;height:100%;min-height:0}
+#gscroll{flex:1;overflow:auto;min-height:0;background:#0d0d10;padding:12px}
+#gcanvas{display:block;image-rendering:pixelated;cursor:crosshair}
+.gsep{width:1px;height:22px;background:var(--line)}
+#gcols{display:flex;gap:4px}
+#gcols .gc{width:30px;height:30px;border-radius:5px;border:2px solid transparent;cursor:pointer;position:relative;font-size:10px;color:#fff;text-shadow:0 0 2px #000;display:flex;align-items:flex-end;justify-content:flex-end;padding:1px 3px}
+#gcols .gc.on{border-color:var(--acc)}
+.mapbar button.on{background:#2d5a48;border-color:#3f7d64}
 #modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:20}
 #modal .box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;max-width:440px}
 #modal .box p{margin:0 0 14px}
@@ -105,6 +114,7 @@ nav .cat small{color:var(--dim)}nav .cat .ed{color:var(--warn)}
   <button id="adjbtn" disabled>Colour grade…</button>
   <button id="prevbtn" disabled>Preview</button>
   <button id="mapsbtn" disabled>Maps</button>
+  <button id="gfxbtn" disabled>Graphics</button>
   <label class="btn" id="loadproj" style="opacity:.4;pointer-events:none">Load project…<input id="projfile" type="file" accept=".json" hidden></label>
   <button id="saveproj" disabled>Save project</button>
   <button id="exportips" disabled>Export IPS</button>
@@ -145,6 +155,24 @@ nav .cat small{color:var(--dim)}nav .cat .ed{color:var(--warn)}
       <div class="row"><button id="sgapply" class="primary">Apply SGB look</button><span class="hint" style="margin:0">Undo (⌘Z) reverts it in one step.</span></div>
     </div>
     <div id="list"></div>
+    <div id="gfxview" style="display:none">
+      <div class="mapbar">
+        <select id="gsheet"></select>
+        <label>Palette <select id="gpal"></select></label>
+        <label>Zoom <select id="gzoom"><option>2</option><option>3</option><option selected>4</option><option>6</option><option>8</option><option>12</option></select></label>
+        <label><input type="checkbox" id="ggrid" checked> Tile grid</label>
+        <span class="gsep"></span>
+        <span id="gcols"></span>
+        <span class="gsep"></span>
+        <button id="gtpen" class="on" title="Pencil (P)">✏️ Pencil</button><button id="gtfill" title="Fill within a tile (F)">🪣 Fill</button><button id="gtpick" title="Eyedropper (I) — or right-click">💧 Pick</button>
+        <span class="gsep"></span>
+        <button id="gexport" title="Download this sheet as a PNG">Export PNG</button>
+        <label class="btn" title="Load an edited PNG of this sheet (same size)">Import PNG<input id="gimport" type="file" accept="image/png" hidden></label>
+        <span id="ginfo" class="hint" style="margin:0 0 0 auto"></span>
+      </div>
+      <div id="gscroll"><canvas id="gcanvas"></canvas></div>
+      <div class="hint" style="margin:6px 12px">Keys: <b>1–4</b> pick colour · <b>P</b>/<b>F</b>/<b>I</b> tools · right-click = eyedropper · hover a tile and press <b>C</b> to copy / <b>V</b> to paste it · <b>⌘Z</b>/<b>⌘⇧Z</b> undo/redo. Colour 1 is transparent on sprites.</div>
+    </div>
     <div id="mapview" style="display:none">
       <div class="mapbar">
         <label class="btn">Load map pack…<input id="mapfile" type="file" accept=".ladxmap" hidden></label>
@@ -222,13 +250,13 @@ async function loadRom(file){
  if(ok===false){
   if(!await confirmBox("This file doesn't match the English v1.2 ROM this editor was mapped against. Palette locations will be wrong on any other version and editing could corrupt the ROM. (If you're reopening a ROM you already edited here, that's fine.)"))return;
  }
- rom=new Uint8Array(buf);romName=file.name.replace(/\.(gbc|gb)$/i,"");states=[];curState=-1;offIndex=null;
+ rom=new Uint8Array(buf);work=rom.slice();tileIndex=null;romName=file.name.replace(/\.(gbc|gb)$/i,"");states=[];curState=-1;offIndex=null;
  orig={};cur={};undo=[];redo=[];updUR();
  for(const e of MAP){const o=e[7][0];orig[e[0]]=[];for(let k=0;k<e[8];k++)orig[e[0]].push(rom[o+2*k]|(rom[o+2*k+1]<<8))}
  for(const e of MAP)cur[e[0]]=orig[e[0]].slice();
  if(ok===false)status("Loaded (unverified ROM — careful)","warn");else status("Loaded: English v1.2 ✓","ok");
  $("drop").style.display="none";
- ["adjbtn","prevbtn","mapsbtn","saveproj","exportips","exportrom"].forEach(i=>$(i).disabled=false);
+ fillSheets();["adjbtn","prevbtn","mapsbtn","gfxbtn","saveproj","exportips","exportrom"].forEach(i=>$(i).disabled=false);
  $("loadproj").style.opacity=1;$("loadproj").style.pointerEvents="auto";
  try{const s=localStorage.getItem("ladx-pal-autosave");if(s&&ok!==false){const p=JSON.parse(s);if(p&&p.edits&&Object.keys(p.edits).length&&await confirmBox("Restore the edits auto-saved from your last session in this browser?"))applyProject(p,false)}}catch(e){}
  render();
@@ -249,10 +277,12 @@ function updUR(){$("undo").disabled=!undo.length;$("redo").disabled=!redo.length
 function pushUndo(changes){if(changes.length){undo.push(changes);redo=[];updUR();autosave()}}
 function setColor(list,w){const ch=[];for(const[n,k]of list){if(cur[n][k]!==w){ch.push([n,k,cur[n][k]]);cur[n][k]=w}}return ch}
 $("undo").onclick=doUndo;
-function doUndo(){const c=undo.pop();if(!c)return;const r=c.map(([n,k])=>[n,k,cur[n][k]]);
- for(let i=c.length-1;i>=0;i--){const[n,k,w]=c[i];cur[n][k]=w}redo.push(r);updUR();autosave();render()}
-function doRedo(){const r=redo.pop();if(!r)return;const u=r.map(([n,k])=>[n,k,cur[n][k]]);
- for(const[n,k,w]of r)cur[n][k]=w;undo.push(u);updUR();autosave();render()}
+const getV=(n,k)=>n===-1?work[k]:cur[n][k],setV=(n,k,w)=>{if(n===-1)work[k]=w;else cur[n][k]=w};
+function afterUR(c){autosave();render();if(c.some(x=>x[0]===-1)){drawGfx();gfxChanged()}}
+function doUndo(){const c=undo.pop();if(!c)return;const r=c.map(([n,k])=>[n,k,getV(n,k)]);
+ for(let i=c.length-1;i>=0;i--){const[n,k,w]=c[i];setV(n,k,w)}redo.push(r);updUR();afterUR(c)}
+function doRedo(){const r=redo.pop();if(!r)return;const u=r.map(([n,k])=>[n,k,getV(n,k)]);
+ for(const[n,k,w]of r)setV(n,k,w);undo.push(u);updUR();afterUR(r)}
 $("redo").onclick=doRedo;
 document.addEventListener("keydown",e=>{const mod=e.metaKey||e.ctrlKey,inp=/INPUT/.test(document.activeElement.tagName)&&document.activeElement.type!=="range";
  if(mod&&!inp&&(e.key==="z"||e.key==="Z")){e.preventDefault();e.shiftKey?doRedo():doUndo()}
@@ -268,7 +298,7 @@ function renderCats(){const c=$("cats");c.innerHTML="";const q=$("search").value
  for(const cat of CATS){const es=MAP.filter(e=>e[1]===cat);const ed=rom?es.filter(e=>cur[e[0]].some((w,k)=>w!==orig[e[0]][k])).length:0;
   const d=document.createElement("div");d.className="cat"+(!q&&cat===curCat?" on":"");
   d.innerHTML=`<span>${cat}</span><small>${ed?`<span class="ed">${ed}✎</span> `:""}${es.length}</small>`;
-  d.onclick=()=>{curCat=cat;$("search").value="";if(mapOn)showMaps(false);render();$("content").scrollTop=0};c.appendChild(d)}}
+  d.onclick=()=>{curCat=cat;$("search").value="";if(mapOn)showMaps(false);if(gfxOn)showGfx(false);render();$("content").scrollTop=0};c.appendChild(d)}}
 let hlWord=null;
 function render(){renderCats();const L=$("list");L.innerHTML="";if(!rom)return;
  const groups=groupsOf(visibleEntries());
@@ -285,7 +315,7 @@ function render(){renderCats();const L=$("list");L.innerHTML="";if(!rom)return;
   const rb=div.querySelector("[data-rg]");if(rb)rb.onclick=()=>{const list=[];for(const e of g.items)cur[e[0]].forEach((w,k)=>{list.push([e[0],k])});
    pushUndo(list.flatMap(([n,k])=>setColor([[n,k]],orig[n][k])));render()};
   frag.appendChild(div)}
- L.appendChild(frag);markPrevRow();drawPrev();if(typeof drawScreen==='function')drawScreen();if(typeof drawMap==='function')drawMap();if(!groups.length)L.innerHTML='<p class="hint">Nothing matches.</p>'}
+ L.appendChild(frag);markPrevRow();drawPrev();if(typeof drawScreen==='function')drawScreen();if(typeof drawMap==='function')drawMap();if(typeof drawGfx==='function')drawGfx();if(!groups.length)L.innerHTML='<p class="hint">Nothing matches.</p>'}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 $("search").oninput=()=>{if(mapOn)showMaps(false);render()};
 
@@ -337,18 +367,21 @@ $("adjapply").onclick=()=>{const sc=$("adjscope").value;const pool=sc==="all"?MA
  pushUndo(ch);status(`Graded ${ch.length} colours`,"ok");render()};
 
 // ---- projects ----
+function gfxDiff(){const out=[];if(!work)return out;let i=0;while(i<rom.length){if(work[i]===rom[i]){i++;continue}let j=i;while(j<rom.length&&work[j]!==rom[j])j++;
+ out.push([i,[...work.subarray(i,j)].map(b=>b.toString(16).padStart(2,"0")).join("")]);i=j}return out}
 function project(){const edits={};for(const e of MAP){if(cur[e[0]].some((w,k)=>w!==orig[e[0]][k]))edits[e[2]+":"+e[4]+":"+e[0]]=cur[e[0]].map(w2hex)}
- return{tool:"LADX Palette Editor",rom:"azle-r2 (English v1.2)",version:1,edits}}
+ return{tool:"LADX Palette Editor",rom:"azle-r2 (English v1.2)",version:2,edits,gfx:gfxDiff()}}
 function applyProject(p,withUndo){if(!p||!p.edits)return status("Not a project file","bad");const ch=[];let n=0;
  for(const[key,cols]of Object.entries(p.edits)){const id=+key.split(":").pop();if(!cur[id])continue;n++;
   cols.forEach((h,k)=>{const w=hex2w(h);if(w!==null&&k<cur[id].length&&cur[id][k]!==w){ch.push([id,k,cur[id][k]]);cur[id][k]=w}})}
- if(withUndo)pushUndo(ch);else autosave();status(`Loaded ${n} edited palettes`,"ok");render()}
+ let g=0;if(Array.isArray(p.gfx)&&work)for(const[o,hex]of p.gfx)for(let q=0;q<hex.length/2;q++){const a=o+q,v=parseInt(hex.substr(q*2,2),16);if(a<work.length&&work[a]!==v){ch.push([-1,a,work[a]]);work[a]=v;g++}}
+ if(withUndo)pushUndo(ch);else autosave();status(`Loaded ${n} edited palettes${g?` and ${g} graphics bytes`:""}`,"ok");render();if(g){drawGfx();gfxChanged()}}
 $("projfile").onchange=e=>{const f=e.target.files[0];if(f)f.text().then(t=>{try{applyProject(JSON.parse(t),true)}catch(x){status("Couldn't read project","bad")}});e.target.value=""};
 function download(data,name,type){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
 $("saveproj").onclick=()=>download(JSON.stringify(project(),null,1),romName+"-palettes.json","application/json");
 
 // ---- export ----
-function buildRom(){const out=rom.slice();
+function buildRom(){const out=(work||rom).slice();
  for(const e of MAP)for(const o of e[7])cur[e[0]].forEach((w,k)=>{out[o+2*k]=w&255;out[o+2*k+1]=w>>8});
  // header checksum (unchanged region, recomputed for safety) and global checksum
  let x=0;for(let i=0x134;i<=0x14C;i++)x=(x-out[i]-1)&255;out[0x14D]=x;
@@ -385,7 +418,7 @@ function drawPrev(){if(!rom||!$("prev").classList.contains("on")||prevN===null)r
  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;const c=bgc||(((x>>2)+(y>>2))&1?[70,70,78]:[52,52,58]);d[i]=c[0];d[i+1]=c[1];d[i+2]=c[2];d[i+3]=255}
  const rgb=cols.map(w2rgb);
  for(let t=0;t<sprites*2;t++){const s=t>>1,half=t&1,ox=(s%8)*8,oy=Math.floor(s/8)*16+half*8,b=off+t*16;
-  for(let y=0;y<8;y++){const lo=rom[b+2*y],hi=rom[b+2*y+1];for(let x=0;x<8;x++){const ci=((lo>>(7-x))&1)|(((hi>>(7-x))&1)<<1);if(!ci)continue;
+  for(let y=0;y<8;y++){const lo=work[b+2*y],hi=work[b+2*y+1];for(let x=0;x<8;x++){const ci=((lo>>(7-x))&1)|(((hi>>(7-x))&1)<<1);if(!ci)continue;
    const i=((oy+y)*W+ox+x)*4;d[i]=rgb[ci][0];d[i+1]=rgb[ci][1];d[i+2]=rgb[ci][2]}}}
  const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;tmp.getContext("2d").putImageData(img,0,0);
  ctx.imageSmoothingEnabled=false;ctx.drawImage(tmp,0,0,W*Z,H*Z);
@@ -510,7 +543,7 @@ $("scanvas").addEventListener("click",ev=>{const s=states[curState];if(!s)return
 $("scanvas").addEventListener("mousemove",ev=>{const s=states[curState];if(!s)return;const r=ev.target.getBoundingClientRect();
  const x=Math.floor((ev.clientX-r.left)/r.width*160),y=Math.floor((ev.clientY-r.top)/r.height*144);if(x<0||y<0||x>159||y>143)return;const p=y*160+x,sl=s.slot[p],k=s.ci[p],w=colourFor(s,sl,k);
  ev.target.title=`${sl<8?"BG "+sl:"OBJ "+(sl-8)} colour ${k} — R ${w&31} G ${(w>>5)&31} B ${(w>>10)&31}`});
-$("statefile").onchange=async e=>{for(const f of e.target.files){try{const s=parseBESS(await f.arrayBuffer(),f.name);rasterise(s);linkState(s);states.push(s);curState=states.length-1}catch(x){status(`${f.name}: ${x.message}`,"bad")}}
+$("statefile").onchange=async e=>{for(const f of e.target.files){try{const s=parseBESS(await f.arrayBuffer(),f.name);if(gfxDirty)patchVram(s);rasterise(s);linkState(s);states.push(s);curState=states.length-1}catch(x){status(`${f.name}: ${x.message}`,"bad")}}
  e.target.value="";renderStates();drawScreen()};
 function renderStates(){$("statelist").innerHTML=states.map((s,i)=>`<button data-i="${i}" class="${i===curState?"on":""}" title="${esc(s.name)}">${esc(s.name)}</button>`).join("")}
 $("statelist").addEventListener("click",ev=>{const b=ev.target.closest("button");if(!b)return;curState=+b.dataset.i;renderStates();drawScreen()});
@@ -522,9 +555,9 @@ $("tabspr").onclick=()=>showTab("spr");$("tabscr").onclick=()=>showTab("scr");
 let pack=null,mapOn=false,mapRAF=0;
 async function loadPack(file){try{
  const ds=new DecompressionStream("gzip");const buf=await new Response(file.stream().pipeThrough(ds)).arrayBuffer();
- const d=new Uint8Array(buf),dv=new DataView(buf),magic=String.fromCharCode(...d.slice(0,8));if(!/^LADXMAP[123]$/.test(magic))throw new Error("not a LADX map pack");
- const hl=dv.getUint32(8,true),hdr=JSON.parse(new TextDecoder().decode(d.slice(12,12+hl)));const base=12+hl,v2=magic!=="LADXMAP1",v3=magic==="LADXMAP3";
- const lastM=hdr.screens[hdr.screens.length-1],linkBase=v3?base+lastM[lastM.length-1]+lastM[lastM.length-2]:0;
+ const d=new Uint8Array(buf),dv=new DataView(buf),magic=String.fromCharCode(...d.slice(0,8));if(!/^LADXMAP[1234]$/.test(magic))throw new Error("not a LADX map pack");
+ const hl=dv.getUint32(8,true),hdr=JSON.parse(new TextDecoder().decode(d.slice(12,12+hl)));const base=12+hl,v2=magic!=="LADXMAP1",v3=magic==="LADXMAP3"||magic==="LADXMAP4",v4=magic==="LADXMAP4";
+ const lastM=hdr.screens[hdr.screens.length-1],linkBase=v3?base+lastM[lastM.length-1]+lastM[lastM.length-2]:0,tsrcBase=v4?linkBase+hdr.screens.length*192:0;
  pack={hdr,cache:new Map(),get(i){if(this.cache.has(i))return this.cache.get(i);const meta=hdr.screens[i];
   let p=v2?base+meta[meta.length-1]:base+i*hdr.blob;const take=n=>{const r=d.subarray(p,p+n);p+=n;return r};const kind=v2?meta[3]:0;let s;
   if(kind===1){ // pre-rendered frame (intro/cutscenes): exact per-pixel palette slot + colour index captured from the emulator
@@ -533,7 +566,7 @@ async function loadPack(file){try{
    s={name:meta[4]||"frame",bgp,obp,ram,hram,slot,ci,bslot:slot,bci:ci,frame:true}}
   else{const io=take(128),vram=take(0x4000),oam=take(0xA0),bgp=take(64),obp=take(64),hram=take(128),rb=take(3);
    const ram=new Uint8Array(0x2000);ram[0x1BA5]=rb[0];ram[0x1B48]=rb[1];ram[0x1B44]=rb[2];
-   const[c,m,r]=meta;s={name:`${["Overworld","Indoor","Side-view"][c]} map ${m.toString(16).toUpperCase()} room ${r.toString(16).toUpperCase().padStart(2,"0")}`,io,vram,oam,bgp,obp,ram,hram};rasterise(s)}
+   const[c,m,r]=meta;s={name:`${["Overworld","Indoor","Side-view"][c]} map ${m.toString(16).toUpperCase()} room ${r.toString(16).toUpperCase().padStart(2,"0")}`,io,vram,oam,bgp,obp,ram,hram};if(v4)s.tsrc=new Uint32Array(buf.slice(tsrcBase+i*3072,tsrcBase+(i+1)*3072));if(work&&gfxDirty)patchVram(s);rasterise(s)}
   if(v3){ // exact links recorded by replaying the capture on an ID-tagged ROM
    s.raw=[...Array(16)].map((_,q)=>[0,1,2,3].map(k=>{const b=q<8?s.bgp:s.obp,o=(q&7)*8+k*2;return b[o]|(b[o+1]<<8)}));
    s.link=[];let lp=linkBase+i*192;for(let q=0;q<16;q++){const row=[];for(let k=0;k<4;k++){const n=d[lp]|(d[lp+1]<<8),kk=d[lp+2];lp+=3;row.push(n?[n-1,kk]:null)}s.link.push(row)}
@@ -544,7 +577,7 @@ async function loadPack(file){try{
  try{localStorage.setItem("ladx-map-last-group","0")}catch(e){}
  status(`Map pack loaded: ${hdr.screens.length} screens`,"ok");drawMap()}catch(x){status("Map pack: "+x.message,"bad")}}
 $("mapfile").onchange=e=>{if(e.target.files[0])loadPack(e.target.files[0]);e.target.value=""};
-function showMaps(on){mapOn=on;$("mapview").style.display=on?"flex":"none";$("list").style.display=on?"none":"block";$("content").classList.toggle("maps",on);
+function showMaps(on){if(on&&gfxOn)showGfx(false);mapOn=on;$("mapview").style.display=on?"flex":"none";$("list").style.display=on?"none":"block";$("content").classList.toggle("maps",on);
  if(on){$("adj").style.display="none";$("drop").style.display="none"}$("mapsbtn").classList.toggle("primary",on);if(on)drawMap()}
 $("mapsbtn").onclick=()=>showMaps(!mapOn);
 ["mapgroup","mapzoom","mapspr","mapgrid"].forEach(id=>$(id).onchange=drawMap);
@@ -570,6 +603,92 @@ $("mapcanvas").addEventListener("mousemove",ev=>{const h=mapHit(ev);if(!h){ev.ta
  ev.target.title=`${h.s.name}\n${h.sl<8?"BG "+h.sl:"OBJ "+(h.sl-8)} colour ${h.k}: R ${w&31} G ${(w>>5)&31} B ${(w>>10)&31}\n${e?(e[5]||e[4])+" (row colour "+h.L[1]+")":"not linked to an editable palette"}`});
 $("mapcanvas").addEventListener("click",ev=>{const h=mapHit(ev);if(!h)return;if(!h.L){status("That colour isn't linked to an editable palette","warn");return}
  const anchor={getBoundingClientRect:()=>({left:ev.clientX,top:ev.clientY,bottom:ev.clientY+6})};openPop(anchor,h.L[0],h.L[1]);drawMap()});
+
+// ---- Graphics (tile & sprite) editor: edits the ROM's 2bpp tile data in place ----
+const GFX=[["characters","evil_eagle/rider hidden","oam",1,32,[88574]],["characters","evil_eagle/rider v1","oam",1,32,[88542]],["characters","color dungeon","oam",8,4608,[868352]],["characters","link 1","oam",8,512,[196608,720896]],["characters","link 2","oam",8,4096,[727040]],["characters","nightmare","oam",8,3072,[829440]],["characters","npc 1","oam",8,16384,[753664]],["characters","npc 2","oam",8,16384,[802816]],["characters","npc 3","oam",8,10240,[819200]],["characters","npc 4","oam",8,768,[308224,832512]],["characters","photographer","oam",8,4096,[917504]],["characters","vfx","oam",8,512,[197120,721408]],["dungeons","camera shop","plain",16,512,[878080]],["dungeons","color dungeon","plain",16,1536,[876544]],["dungeons","doors","plain",16,1024,[737792]],["dungeons","eagles tower top 1","plain",16,1024,[845824]],["dungeons","eagles tower top 2","plain",16,1024,[850944]],["dungeons","floor/floor a","plain",2,256,[740352]],["dungeons","floor/floor b","plain",2,256,[740608]],["dungeons","floor/floor c","plain",2,256,[740864]],["dungeons","floor/floor d","plain",2,256,[741120]],["dungeons","floor/floor e","plain",2,256,[745472]],["dungeons","floor/floor f","plain",2,256,[745728]],["dungeons","floor/floor g","plain",2,256,[745984]],["dungeons","floor/floor h","plain",2,256,[746240]],["dungeons","floor/floor i","plain",2,256,[746496]],["dungeons","floor/floor j","plain",2,256,[746752]],["dungeons","floor/floor k","plain",2,256,[747008]],["dungeons","floor/floor l","plain",2,256,[748288]],["dungeons","floor/windfish floor","plain",2,256,[223744,748032]],["dungeons","sideview 1","plain",16,2048,[749568]],["dungeons","sideview 2","plain",16,2048,[751616]],["dungeons","walls/walls a","plain",2,512,[212992,737280]],["dungeons","walls/walls b","plain",2,512,[738816]],["dungeons","walls/walls c","plain",2,512,[215040,739328]],["dungeons","walls/walls d","plain",2,512,[215552,739840]],["dungeons","walls/walls e","plain",2,512,[224256,748544]],["dungeons","walls/walls f","plain",2,512,[224768,749056]],["ending","credits roll","plain",16,2048,[921600]],["ending","ending.cgb.alt","plain",16,2048,[882688]],["ending","ending 1","plain",16,10240,[835584]],["ending","ending 2","plain",16,4096,[846848]],["ending","marin portrait","oam",6,768,[925696]],["ending","marin portrait overlay","oam",2,512,[926464]],["ending","thanks for playing","plain",16,768,[927744]],["fonts","font","plain",16,2560,[249856,774144]],["fonts","font large","plain",16,2304,[796416]],["indoor","tilesets/00","plain",2,256,[741376]],["indoor","tilesets/01","plain",2,256,[741632]],["indoor","tilesets/02","plain",2,256,[741888]],["indoor","tilesets/03","plain",2,256,[217856,742144]],["indoor","tilesets/04","plain",2,256,[742400]],["indoor","tilesets/05","plain",2,256,[742656]],["indoor","tilesets/06","plain",2,256,[218624,742912]],["indoor","tilesets/07","plain",2,256,[743168]],["indoor","tilesets/08","plain",2,256,[743424]],["indoor","tilesets/09","plain",2,256,[743680]],["indoor","tilesets/0A","plain",2,256,[743936]],["indoor","tilesets/0B","plain",2,256,[219904,744192]],["indoor","tilesets/0C","plain",2,256,[744448]],["indoor","tilesets/0D","plain",2,256,[220416,744704]],["indoor","tilesets/0E","plain",2,256,[744960]],["indoor","tilesets/0F","plain",2,256,[745216]],["indoor","tilesets/17","plain",2,256,[222976,747264]],["indoor","tilesets/18","plain",2,256,[223232,747520]],["indoor","tilesets/19","plain",2,256,[747776]],["intro","intro 1","plain",4,4096,[786432]],["intro","intro 2","plain",4,1024,[790528]],["intro","intro 3","plain",4,1024,[791552]],["intro","title dx (sprites)","oam",2,768,[926976]],["intro","rain","plain",2,128,[28173]],["intro","title","plain",16,1792,[772352]],["intro","title dx (tiles)","plain",1,1024,[923648,924672]],["items","dungeon a","plain",16,256,[833280]],["items","dungeon b","plain",16,256,[833536]],["items","dungeon c","plain",16,256,[833792]],["items","dungeon d","plain",16,256,[309760,834048]],["items","house a","plain",16,256,[834304]],["items","house b","plain",16,256,[834560]],["items","instruments","plain",16,512,[199936,724224]],["items","inventory indoor items","plain",1,256,[834816]],["items","inventory overworld items","plain",1,256,[199680,723968]],["items","items 1","plain",16,1024,[721920]],["items","items 2","plain",16,1024,[722944]],["items","minimap cgb","plain",16,512,[835072]],["items","minimap dmg","plain",16,512,[310784]],["items","mushroom","plain",1,32,[207040,731328]],["items","ocarina symbols","plain",10,160,[207200,731488]],["items","piece of heart meter","plain",6,96,[731392]],["items","slime key","plain",1,32,[207072,731360]],["items","switch block","plain",2,192,[731136]],["menus","menu","plain",16,1024,[245760,770048]],["menus","print","plain",16,16384,[851968]],["menus","save menu","plain",16,1280,[246784,771072]],["photos","photo album","plain",16,4096,[878592]],["photos","photo bow wow","plain",16,4096,[692224]],["photos","photo bridge","plain",16,4096,[716800]],["photos","photo dizzy link","plain",16,4096,[978944]],["photos","photo elements 1","plain",16,16384,[933888]],["photos","photo elements 2","plain",16,16384,[950272]],["photos","photo elements 3","plain",16,12288,[966656]],["photos","photo elements 4","plain",16,3328,[928512]],["photos","photo fisherman","plain",16,4096,[700416]],["photos","photo ghost","plain",16,4096,[712704]],["photos","photo kanalet","plain",16,4096,[708608]],["photos","photo mabe","plain",16,4096,[684032]],["photos","photo marin cliff","plain",16,4096,[675840]],["photos","photo marin well","plain",16,4096,[679936]],["photos","photo nice link","plain",16,4096,[671744]],["photos","photo shop","plain",16,4096,[696320]],["photos","photo ulrira","plain",16,4096,[688128]],["photos","photo zora","plain",16,4096,[704512]],["photos","print ui 1","plain",1,1280,[856576,872960]],["photos","print ui 2","plain",16,2304,[857856,874240]],["scenes","christine","plain",16,2048,[792576]],["scenes","marin beach","plain",16,1280,[794624]],["scenes","marin beach waves","plain",16,512,[795904]],["scenes","painting","plain",16,2048,[276480,800768]],["scenes","relief","plain",16,2048,[274432,798720]],["world","animated tiles.w32","plain",4,3584,[731648]],["world","minimap","plain",16,2048,[735232]],["world","overworld 1","plain",16,768,[724736]],["world","overworld landscape","plain",16,1536,[725504]],["world","ow anglers tunnel","plain",16,512,[259072,783360]],["world","ow beach","plain",16,512,[778752]],["world","ow camera shop","plain",16,512,[776704]],["world","ow eagles tower","plain",16,512,[782336]],["world","ow egg","plain",16,512,[785408]],["world","ow face shrine","plain",16,512,[780800]],["world","ow gopongo swamp","plain",16,512,[783872]],["world","ow graveyard","plain",16,512,[784384]],["world","ow kanalet castle","plain",16,512,[780288]],["world","ow mabe village","plain",16,512,[779776]],["world","ow marthas bay","plain",16,512,[784896]],["world","ow mysterious woods","plain",16,512,[778240]],["world","ow prairie south","plain",16,512,[781824]],["world","ow prairie stone head","plain",16,512,[779264]],["world","ow rafting game","plain",16,512,[782848]],["world","ow seashell mansion","plain",16,512,[777728]],["world","ow taramanch middle","plain",16,512,[785920]],["world","ow turtle rock","plain",16,512,[777216]],["world","ow yarna desert","plain",16,512,[781312]]];
+let work=null,gfxSel=0,gfxTool="pen",gfxColour=3,gfxOn=false,gfxClip=null,stroke=null,tileIndex=null;
+const FOLDERS={characters:"Characters (Link, NPCs, enemies)",items:"Items & objects",world:"Overworld tiles",indoor:"Interior tiles",dungeons:"Dungeon tiles",menus:"Menus & HUD",fonts:"Fonts",intro:"Intro",ending:"Ending",scenes:"Cutscenes",photos:"Photo album"};
+function fillSheets(){const s=$("gsheet");let h="";for(const f of Object.keys(FOLDERS)){const es=GFX.map((e,i)=>[e,i]).filter(([e])=>e[0]===f);if(!es.length)continue;
+ h+=`<optgroup label="${FOLDERS[f]}">`+es.map(([e,i])=>`<option value="${i}">${esc(e[1])} (${e[4]/16} tiles${e[5].length>1?", "+e[5].length+" copies":""})</option>`).join("")+"</optgroup>"}s.innerHTML=h}
+function fillGPal(){const s=$("gpal"),v=s.value;let h=`<option value="grey">Greyscale</option>`;OBJN.forEach((n,i)=>h+=`<option value="${n}">${OBJNAMES[i]}</option>`);
+ if(prevN!==null&&!OBJN.includes(prevN)){const e=byN[prevN];h+=`<option value="${prevN}">Last clicked: ${esc(e[5]||e[4])}</option>`}s.innerHTML=h;if([...s.options].some(o=>o.value===v))s.value=v}
+const GREY=[0x7FFF,0x56B5,0x294A,0x0000];
+function gfxColours(){const v=$("gpal").value;if(v==="grey"||!cur[+v])return GREY;const c=cur[+v];return c.length>=4?c:GREY}
+function sheetGeom(e){const tiles=e[4]/16,cols=Math.max(1,e[3]);if(e[2]==="oam")return{W:cols*8,H:Math.ceil(tiles/2/cols)*16,tiles};return{W:cols*8,H:Math.ceil(tiles/cols)*8,tiles}}
+function tileXY(e,t){const c=Math.max(1,e[3]);if(e[2]==="oam"){const s=t>>1;return[(s%c)*8,Math.floor(s/c)*16+(t&1)*8]}return[(t%c)*8,Math.floor(t/c)*8]}
+function tileAt(e,x,y){const c=Math.max(1,e[3]);if(e[2]==="oam"){const s=Math.floor(y/16)*c+(x>>3);return s*2+((y%16)>=8?1:0)}return Math.floor(y/8)*c+(x>>3)}
+function getPx(e,t,lx,ly){const b=e[5][0]+t*16+ly*2;return((work[b]>>(7-lx))&1)|(((work[b+1]>>(7-lx))&1)<<1)}
+function setPx(e,t,lx,ly,c,changes){for(const o of e[5]){const b=o+t*16+ly*2;const m=1<<(7-lx);
+  for(const[bb,bit]of[[b,c&1],[b+1,(c>>1)&1]]){const nv=bit?work[bb]|m:work[bb]&~m;if(nv!==work[bb]){if(!changes.has(bb))changes.set(bb,work[bb]);work[bb]=nv}}}}
+function drawGfx(){if(!gfxOn||!work)return;const e=GFX[gfxSel],{W,H,tiles}=sheetGeom(e),Z=+$("gzoom").value,cv=$("gcanvas");
+ const cols=gfxColours().map(w2rgb);cv.width=W*Z;cv.height=H*Z;const ctx=cv.getContext("2d"),img=ctx.createImageData(W,H),d=img.data;
+ for(let i=0;i<d.length;i+=4){d[i]=30;d[i+1]=30;d[i+2]=36;d[i+3]=255}
+ for(let t=0;t<tiles;t++){const[ox,oy]=tileXY(e,t);for(let y=0;y<8;y++)for(let x=0;x<8;x++){const c=cols[getPx(e,t,x,y)],i=((oy+y)*W+ox+x)*4;d[i]=c[0];d[i+1]=c[1];d[i+2]=c[2]}}
+ const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;tmp.getContext("2d").putImageData(img,0,0);ctx.imageSmoothingEnabled=false;ctx.drawImage(tmp,0,0,W*Z,H*Z);
+ if($("ggrid").checked&&Z>=3){ctx.strokeStyle="rgba(255,255,255,.12)";ctx.beginPath();for(let x=0;x<=W;x+=8){ctx.moveTo(x*Z+.5,0);ctx.lineTo(x*Z+.5,H*Z)}
+  for(let y=0;y<=H;y+=(e[2]==="oam"?16:8)){ctx.moveTo(0,y*Z+.5);ctx.lineTo(W*Z,y*Z+.5)}ctx.stroke();
+  if(e[2]==="oam"){ctx.strokeStyle="rgba(255,255,255,.05)";ctx.beginPath();for(let y=8;y<=H;y+=16){ctx.moveTo(0,y*Z+.5);ctx.lineTo(W*Z,y*Z+.5)}ctx.stroke()}}
+ $("gcols").innerHTML=gfxColours().map((w,k)=>`<div class="gc${k===gfxColour?" on":""}" data-k="${k}" style="background:${css(w)}" title="Colour ${k} (key ${k+1})">${k+1}</div>`).join("");
+ const ed=countGfxEdits(e);$("ginfo").textContent=`${e[4]/16} tiles · ${e[2]==="oam"?"8×16 sprite layout":"8×8 tiles"} · ROM ${e[5].map(o=>o.toString(16).toUpperCase()).join(", ")}${ed?` · ${ed} bytes edited`:""}`}
+function countGfxEdits(e){let n=0;const o=e[5][0];for(let i=0;i<e[4];i++)if(work[o+i]!==rom[o+i])n++;return n}
+$("gcols").addEventListener("click",ev=>{const c=ev.target.closest(".gc");if(c){gfxColour=+c.dataset.k;drawGfx()}});
+function setTool(tl){gfxTool=tl;["pen","fill","pick"].forEach(x=>$("gt"+x).classList.toggle("on",x===tl))}
+$("gtpen").onclick=()=>setTool("pen");$("gtfill").onclick=()=>setTool("fill");$("gtpick").onclick=()=>setTool("pick");
+["gsheet","gzoom","ggrid","gpal"].forEach(id=>$(id).onchange=()=>{gfxSel=+$("gsheet").value;drawGfx()});
+function gPos(ev){const e=GFX[gfxSel],Z=+$("gzoom").value,r=$("gcanvas").getBoundingClientRect(),x=Math.floor((ev.clientX-r.left)/Z),y=Math.floor((ev.clientY-r.top)/Z),{W,H,tiles}=sheetGeom(e);
+ if(x<0||y<0||x>=W||y>=H)return null;const t=tileAt(e,x,y);if(t>=tiles)return null;const[ox,oy]=tileXY(e,t);return{e,t,lx:x-ox,ly:y-oy}}
+function floodTile(e,t,lx,ly,c,ch){const from=getPx(e,t,lx,ly);if(from===c)return;const st=[[lx,ly]];
+ while(st.length){const[x,y]=st.pop();if(x<0||y<0||x>7||y>7||getPx(e,t,x,y)!==from)continue;setPx(e,t,x,y,c,ch);st.push([x+1,y],[x-1,y],[x,y+1],[x,y-1])}}
+$("gcanvas").addEventListener("contextmenu",ev=>ev.preventDefault());
+$("gcanvas").addEventListener("mousedown",ev=>{const p=gPos(ev);if(!p)return;
+ if(ev.button===2||ev.altKey||gfxTool==="pick"){gfxColour=getPx(p.e,p.t,p.lx,p.ly);drawGfx();return}
+ stroke=new Map();if(gfxTool==="fill")floodTile(p.e,p.t,p.lx,p.ly,gfxColour,stroke);else setPx(p.e,p.t,p.lx,p.ly,gfxColour,stroke);drawGfx();if(gfxTool==="fill")endStroke()});
+$("gcanvas").addEventListener("mousemove",ev=>{const p=gPos(ev);gHover=p;if(p)$("gcanvas").title=`tile ${p.t} (${p.t.toString(16).toUpperCase()}) · pixel ${p.lx},${p.ly} · colour ${getPx(p.e,p.t,p.lx,p.ly)+1}`;
+ if(stroke&&p&&gfxTool==="pen"&&(ev.buttons&1)){setPx(p.e,p.t,p.lx,p.ly,gfxColour,stroke);drawGfx()}});
+let gHover=null;
+document.addEventListener("mouseup",()=>{if(stroke)endStroke()});
+function endStroke(){const ch=[...stroke].map(([a,old])=>[-1,a,old]);stroke=null;pushUndo(ch);gfxChanged()}
+let gfxT;function gfxChanged(){clearTimeout(gfxT);gfxT=setTimeout(()=>{drawPrev();refreshGfxPreviews()},350)}
+document.addEventListener("keydown",ev=>{if(!gfxOn||/INPUT|SELECT/.test(document.activeElement.tagName)||ev.metaKey||ev.ctrlKey)return;
+ if(/^[1-4]$/.test(ev.key)){gfxColour=+ev.key-1;drawGfx()}else if(ev.key==="p")setTool("pen");else if(ev.key==="f")setTool("fill");else if(ev.key==="i")setTool("pick");
+ else if(ev.key==="c"&&gHover){gfxClip=[];for(let y=0;y<8;y++)for(let x=0;x<8;x++)gfxClip.push(getPx(gHover.e,gHover.t,x,y));status(`Copied tile ${gHover.t}`,"ok")}
+ else if(ev.key==="v"&&gHover&&gfxClip){const ch=new Map();for(let y=0;y<8;y++)for(let x=0;x<8;x++)setPx(gHover.e,gHover.t,x,y,gfxClip[y*8+x],ch);
+  pushUndo([...ch].map(([a,o])=>[-1,a,o]));drawGfx();gfxChanged();status(`Pasted into tile ${gHover.t}`,"ok")}});
+// PNG export / import (sheet layout, current palette colours)
+$("gexport").onclick=()=>{const e=GFX[gfxSel],{W,H,tiles}=sheetGeom(e),cols=gfxColours().map(w2rgb),c=document.createElement("canvas");c.width=W;c.height=H;
+ const ctx=c.getContext("2d"),img=ctx.createImageData(W,H),d=img.data;
+ for(let t=0;t<tiles;t++){const[ox,oy]=tileXY(e,t);for(let y=0;y<8;y++)for(let x=0;x<8;x++){const cc=cols[getPx(e,t,x,y)],i=((oy+y)*W+ox+x)*4;d[i]=cc[0];d[i+1]=cc[1];d[i+2]=cc[2];d[i+3]=255}}
+ ctx.putImageData(img,0,0);c.toBlob(b=>download(b,`${e[1].replace(/[^\w-]+/g,"_")}.png`,"image/png"))};
+$("gimport").onchange=async ev=>{const f=ev.target.files[0];ev.target.value="";if(!f)return;const e=GFX[gfxSel],{W,H,tiles}=sheetGeom(e);
+ const bmp=await createImageBitmap(f);if(bmp.width!==W||bmp.height!==H){status(`PNG must be ${W}×${H} (this sheet's size); got ${bmp.width}×${bmp.height}`,"bad");return}
+ const c=document.createElement("canvas");c.width=W;c.height=H;const ctx=c.getContext("2d");ctx.drawImage(bmp,0,0);const d=ctx.getImageData(0,0,W,H).data,cols=gfxColours().map(w2rgb);
+ // map each pixel to the nearest of the 4 current colours; if the PNG uses exactly 4 colours that don't match, map them by brightness
+ const uniq=new Map();for(let i=0;i<d.length;i+=4)uniq.set((d[i]<<16)|(d[i+1]<<8)|d[i+2],0);
+ const near=(r,g,b)=>{let bi=0,bd=1e9;cols.forEach((c,k)=>{const dd=(c[0]-r)**2+(c[1]-g)**2+(c[2]-b)**2;if(dd<bd){bd=dd;bi=k}});return[bi,bd]};
+ let exact=[...uniq.keys()].every(v=>near(v>>16,(v>>8)&255,v&255)[1]===0),lut=new Map();
+ if(!exact&&uniq.size<=4){const lum=v=>.299*(v>>16)+.587*((v>>8)&255)+.114*(v&255);const sorted=[...uniq.keys()].sort((a,b)=>lum(b)-lum(a));
+  const pl=cols.map((c,k)=>[k,.299*c[0]+.587*c[1]+.114*c[2]]).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);sorted.forEach((v,i)=>lut.set(v,pl[Math.round(i*(3/(Math.max(1,sorted.length-1))))]))}
+ const ch=new Map();for(let t=0;t<tiles;t++){const[ox,oy]=tileXY(e,t);for(let y=0;y<8;y++)for(let x=0;x<8;x++){const i=((oy+y)*W+ox+x)*4,v=(d[i]<<16)|(d[i+1]<<8)|d[i+2];
+  setPx(e,t,x,y,lut.has(v)?lut.get(v):near(d[i],d[i+1],d[i+2])[0],ch)}}
+ pushUndo([...ch].map(([a,o])=>[-1,a,o]));drawGfx();gfxChanged();status(`Imported PNG: ${ch.size} bytes changed${exact?"":" (colours matched to nearest palette colour)"}`,"ok")};
+function showGfx(on){gfxOn=on;if(on&&mapOn)showMaps(false);$("gfxview").style.display=on?"flex":"none";if(on){$("list").style.display="none";$("adj").style.display="none"}else if(!mapOn)$("list").style.display="block";
+ $("content").classList.toggle("maps",on||mapOn);$("gfxbtn").classList.toggle("primary",on);if(on){fillGPal();drawGfx()}}
+$("gfxbtn").onclick=()=>showGfx(!gfxOn);
+// Previews follow graphics edits: VRAM tiles in save states / the map pack are traced back to their ROM tiles by content
+function buildTileIndex(){tileIndex=new Map();for(const e of GFX)for(let t=0;t<e[4]/16;t++){const o=e[5][0]+t*16;const k=String.fromCharCode(...rom.subarray(o,o+16));
+ const offs=e[5].map(b=>b+t*16);if(!tileIndex.has(k))tileIndex.set(k,offs);else tileIndex.get(k).push(...offs)}}
+const tileEdited=o=>{for(let i=0;i<16;i++)if(work[o+i]!==rom[o+i])return true;return false};
+function patchVram(s){if(!s.vram)return;if(!s.vram0)s.vram0=s.vram.slice();const v=s.vram0.slice();let j=0;
+ for(const base of[0,0x2000])for(let a=base;a<base+0x1800;a+=16,j++){
+  if(s.tsrc){const o=s.tsrc[j]-1;if(o>=0&&tileEdited(o))v.set(work.subarray(o,o+16),a);continue} // map pack: exact traced source tile
+  // your own save states: match by content, only when the match is unambiguous
+  if(!tileIndex)buildTileIndex();const L=tileIndex.get(String.fromCharCode(...v.subarray(a,a+16)));if(!L)continue;
+  const ed=L.filter(tileEdited);if(!ed.length||ed.length!==L.length)continue;const n0=work.subarray(ed[0],ed[0]+16);
+  if(ed.every(o=>work.subarray(o,o+16).every((b,q)=>b===n0[q])))v.set(n0,a)}s.vram=v}
+function anyGfxEdits(){for(const e of GFX)for(const o of e[5])for(let i=0;i<e[4];i++)if(work[o+i]!==rom[o+i])return true;return false}
+let gfxDirty=false;
+function refreshGfxPreviews(){gfxDirty=true;for(const s of states){patchVram(s);rasterise(s)}
+ if(pack){for(const[i,s]of pack.cache)if(!s.frame){patchVram(s);rasterise(s)}}drawScreen();drawMap()}
 renderCats();
 </script>
 </body>
