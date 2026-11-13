@@ -100,6 +100,28 @@ nav .cat small{color:var(--dim)}nav .cat .ed{color:var(--warn)}
 #gcols .gc{width:30px;height:30px;border-radius:5px;border:2px solid transparent;cursor:pointer;position:relative;font-size:10px;color:#fff;text-shadow:0 0 2px #000;display:flex;align-items:flex-end;justify-content:flex-end;padding:1px 3px}
 #gcols .gc.on{border-color:var(--acc)}
 .mapbar button.on{background:#2d5a48;border-color:#3f7d64}
+#txtview{display:flex;height:100%;min-height:0}
+#txtlistcol{width:320px;border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;background:var(--panel)}
+#txtlistcol input#tsearch{margin:8px;padding:6px 8px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px}
+.tfilter{color:var(--dim);font-size:12px;margin:0 10px 6px}
+#tlist{flex:1;overflow:auto;min-height:0}
+.trow{padding:6px 10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:12px}
+.trow:hover{background:var(--panel2)}.trow.on{background:#2d5a48}
+.trow b{font-family:ui-monospace,Menlo,monospace;font-weight:normal;color:var(--dim);margin-right:6px}
+.trow .sp{color:var(--acc)}.trow .ed{color:var(--warn);margin-left:4px}
+.trow .tx{color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+#txteditcol{flex:1;overflow:auto;padding:12px 16px;min-width:0}
+#thead{font-size:14px;margin-bottom:8px}
+.ttools{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.ttools button{padding:3px 8px}
+#tname{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:3px}
+#ttext{width:100%;min-height:130px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;font:14px/1.5 ui-monospace,Menlo,monospace;resize:vertical}
+#terr.bad{color:var(--bad)}
+#tmeter{font-size:12px;color:var(--dim);margin:6px 0 10px}
+#tmeter .bar{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;margin-top:4px;max-width:420px}
+#tmeter .bar i{display:block;height:100%;background:var(--acc)}
+#tprev{display:flex;flex-wrap:wrap;gap:10px}
+#tprev canvas{image-rendering:pixelated;border-radius:4px}
 #modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:20}
 #modal .box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;max-width:440px}
 #modal .box p{margin:0 0 14px}
@@ -115,6 +137,7 @@ nav .cat small{color:var(--dim)}nav .cat .ed{color:var(--warn)}
   <button id="prevbtn" disabled>Preview</button>
   <button id="mapsbtn" disabled>Maps</button>
   <button id="gfxbtn" disabled>Graphics</button>
+  <button id="txtbtn" disabled>Text</button>
   <label class="btn" id="loadproj" style="opacity:.4;pointer-events:none">Load project…<input id="projfile" type="file" accept=".json" hidden></label>
   <button id="saveproj" disabled>Save project</button>
   <button id="exportips" disabled>Export IPS</button>
@@ -172,6 +195,27 @@ nav .cat small{color:var(--dim)}nav .cat .ed{color:var(--warn)}
       </div>
       <div id="gscroll"><canvas id="gcanvas"></canvas></div>
       <div class="hint" style="margin:6px 12px">Keys: <b>1–4</b> pick colour · <b>P</b>/<b>F</b>/<b>I</b> tools · right-click = eyedropper · hover a tile and press <b>C</b> to copy / <b>V</b> to paste it · <b>⌘Z</b>/<b>⌘⇧Z</b> undo/redo. Colour 1 is transparent on sprites.</div>
+    </div>
+    <div id="txtview" style="display:none">
+      <div id="txtlistcol">
+        <input id="tsearch" placeholder="Search text, speaker or ID…">
+        <label class="tfilter"><input type="checkbox" id="tedited"> Edited only</label>
+        <div id="tlist"></div>
+      </div>
+      <div id="txteditcol">
+        <div id="thead"></div>
+        <div class="ttools">
+          <span class="hint" style="margin:0">Insert:</span>
+          <button data-tok="#####" title="Player's name">Name</button><button data-tok="<up>">↑</button><button data-tok="<down>">↓</button><button data-tok="<left>">←</button><button data-tok="<right>">→</button><button data-tok="<dpad>">✚</button><button data-tok="<ask>" title="Yes/No prompt marker — keep it where the original had it">&lt;ask&gt;</button>
+          <span class="gsep"></span>
+          <label class="hint" style="margin:0;display:flex;gap:4px;align-items:center">Name <input id="tname" value="LINK" maxlength="5" style="width:60px"></label>
+          <button id="trevert" style="margin-left:auto">Revert this dialog</button>
+        </div>
+        <textarea id="ttext" spellcheck="true"></textarea>
+        <div id="terr" class="hint" style="margin:4px 0"></div>
+        <div id="tmeter"></div>
+        <div id="tprev"></div>
+      </div>
     </div>
     <div id="mapview" style="display:none">
       <div class="mapbar">
@@ -256,7 +300,7 @@ async function loadRom(file){
  for(const e of MAP)cur[e[0]]=orig[e[0]].slice();
  if(ok===false)status("Loaded (unverified ROM — careful)","warn");else status("Loaded: English v1.2 ✓","ok");
  $("drop").style.display="none";
- fillSheets();["adjbtn","prevbtn","mapsbtn","gfxbtn","saveproj","exportips","exportrom"].forEach(i=>$(i).disabled=false);
+ loadTexts();fillSheets();["adjbtn","prevbtn","mapsbtn","gfxbtn","txtbtn","saveproj","exportips","exportrom"].forEach(i=>$(i).disabled=false);
  $("loadproj").style.opacity=1;$("loadproj").style.pointerEvents="auto";
  try{const s=localStorage.getItem("ladx-pal-autosave");if(s&&ok!==false){const p=JSON.parse(s);if(p&&p.edits&&Object.keys(p.edits).length&&await confirmBox("Restore the edits auto-saved from your last session in this browser?"))applyProject(p,false)}}catch(e){}
  render();
@@ -277,14 +321,14 @@ function updUR(){$("undo").disabled=!undo.length;$("redo").disabled=!redo.length
 function pushUndo(changes){if(changes.length){undo.push(changes);redo=[];updUR();autosave()}}
 function setColor(list,w){const ch=[];for(const[n,k]of list){if(cur[n][k]!==w){ch.push([n,k,cur[n][k]]);cur[n][k]=w}}return ch}
 $("undo").onclick=doUndo;
-const getV=(n,k)=>n===-1?work[k]:cur[n][k],setV=(n,k,w)=>{if(n===-1)work[k]=w;else cur[n][k]=w};
-function afterUR(c){autosave();render();if(c.some(x=>x[0]===-1)){drawGfx();gfxChanged()}}
-function doUndo(){const c=undo.pop();if(!c)return;const r=c.map(([n,k])=>[n,k,getV(n,k)]);
+const getV=(n,k)=>n===-1?work[k]:n===-2?tCur[k]:cur[n][k],setV=(n,k,w)=>{if(n===-1)work[k]=w;else if(n===-2)tCur[k]=w;else cur[n][k]=w};
+function afterUR(c){autosave();render();if(c.some(x=>x[0]===-1)){drawGfx();gfxChanged()}if(c.some(x=>x[0]===-2)&&txtOn){const t2=c.find(x=>x[0]===-2);tSel=t2[1];renderTList();renderTEditor()}}
+function doUndo(){if(typeof commitText==='function'&&tPending!==null)commitText();const c=undo.pop();if(!c)return;const r=c.map(([n,k])=>[n,k,getV(n,k)]);
  for(let i=c.length-1;i>=0;i--){const[n,k,w]=c[i];setV(n,k,w)}redo.push(r);updUR();afterUR(c)}
 function doRedo(){const r=redo.pop();if(!r)return;const u=r.map(([n,k])=>[n,k,getV(n,k)]);
  for(const[n,k,w]of r)setV(n,k,w);undo.push(u);updUR();afterUR(r)}
 $("redo").onclick=doRedo;
-document.addEventListener("keydown",e=>{const mod=e.metaKey||e.ctrlKey,inp=/INPUT/.test(document.activeElement.tagName)&&document.activeElement.type!=="range";
+document.addEventListener("keydown",e=>{const mod=e.metaKey||e.ctrlKey,inp=(/INPUT|TEXTAREA/.test(document.activeElement.tagName))&&document.activeElement.type!=="range";
  if(mod&&!inp&&(e.key==="z"||e.key==="Z")){e.preventDefault();e.shiftKey?doRedo():doUndo()}
  else if(mod&&!inp&&(e.key==="y"||e.key==="Y")){e.preventDefault();doRedo()}if(e.key==="Escape")closePop()});
 let saveT;function autosave(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem("ladx-pal-autosave",JSON.stringify(project()))}catch(e){}},400)}
@@ -298,7 +342,7 @@ function renderCats(){const c=$("cats");c.innerHTML="";const q=$("search").value
  for(const cat of CATS){const es=MAP.filter(e=>e[1]===cat);const ed=rom?es.filter(e=>cur[e[0]].some((w,k)=>w!==orig[e[0]][k])).length:0;
   const d=document.createElement("div");d.className="cat"+(!q&&cat===curCat?" on":"");
   d.innerHTML=`<span>${cat}</span><small>${ed?`<span class="ed">${ed}✎</span> `:""}${es.length}</small>`;
-  d.onclick=()=>{curCat=cat;$("search").value="";if(mapOn)showMaps(false);if(gfxOn)showGfx(false);render();$("content").scrollTop=0};c.appendChild(d)}}
+  d.onclick=()=>{curCat=cat;$("search").value="";if(mapOn)showMaps(false);if(gfxOn)showGfx(false);if(txtOn)showTxt(false);render();$("content").scrollTop=0};c.appendChild(d)}}
 let hlWord=null;
 function render(){renderCats();const L=$("list");L.innerHTML="";if(!rom)return;
  const groups=groupsOf(visibleEntries());
@@ -370,12 +414,13 @@ $("adjapply").onclick=()=>{const sc=$("adjscope").value;const pool=sc==="all"?MA
 function gfxDiff(){const out=[];if(!work)return out;let i=0;while(i<rom.length){if(work[i]===rom[i]){i++;continue}let j=i;while(j<rom.length&&work[j]!==rom[j])j++;
  out.push([i,[...work.subarray(i,j)].map(b=>b.toString(16).padStart(2,"0")).join("")]);i=j}return out}
 function project(){const edits={};for(const e of MAP){if(cur[e[0]].some((w,k)=>w!==orig[e[0]][k]))edits[e[2]+":"+e[4]+":"+e[0]]=cur[e[0]].map(w2hex)}
- return{tool:"LADX Palette Editor",rom:"azle-r2 (English v1.2)",version:2,edits,gfx:gfxDiff()}}
+ const text={};if(tCur)tCur.forEach((s,i)=>{if(s!==tOrig[i])text[i]=s});return{tool:"LADX Palette Editor",rom:"azle-r2 (English v1.2)",version:3,edits,gfx:gfxDiff(),text}}
 function applyProject(p,withUndo){if(!p||!p.edits)return status("Not a project file","bad");const ch=[];let n=0;
  for(const[key,cols]of Object.entries(p.edits)){const id=+key.split(":").pop();if(!cur[id])continue;n++;
   cols.forEach((h,k)=>{const w=hex2w(h);if(w!==null&&k<cur[id].length&&cur[id][k]!==w){ch.push([id,k,cur[id][k]]);cur[id][k]=w}})}
  let g=0;if(Array.isArray(p.gfx)&&work)for(const[o,hex]of p.gfx)for(let q=0;q<hex.length/2;q++){const a=o+q,v=parseInt(hex.substr(q*2,2),16);if(a<work.length&&work[a]!==v){ch.push([-1,a,work[a]]);work[a]=v;g++}}
- if(withUndo)pushUndo(ch);else autosave();status(`Loaded ${n} edited palettes${g?` and ${g} graphics bytes`:""}`,"ok");render();if(g){drawGfx();gfxChanged()}}
+ let tx=0;if(p.text&&tCur)for(const[i,s]of Object.entries(p.text)){const id=+i;if(id<TX.N&&tCur[id]!==s){ch.push([-2,id,tCur[id]]);tCur[id]=s;tx++}}
+ if(withUndo)pushUndo(ch);else autosave();status(`Loaded ${n} edited palettes${g?`, ${g} graphics bytes`:""}${tx?`, ${tx} edited dialogs`:""}`,"ok");render();if(g){drawGfx();gfxChanged()}if(tx&&txtOn){renderTList();renderTEditor()}}
 $("projfile").onchange=e=>{const f=e.target.files[0];if(f)f.text().then(t=>{try{applyProject(JSON.parse(t),true)}catch(x){status("Couldn't read project","bad")}});e.target.value=""};
 function download(data,name,type){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
 $("saveproj").onclick=()=>download(JSON.stringify(project(),null,1),romName+"-palettes.json","application/json");
@@ -384,10 +429,11 @@ $("saveproj").onclick=()=>download(JSON.stringify(project(),null,1),romName+"-pa
 function buildRom(){const out=(work||rom).slice();
  for(const e of MAP)for(const o of e[7])cur[e[0]].forEach((w,k)=>{out[o+2*k]=w&255;out[o+2*k+1]=w>>8});
  // header checksum (unchanged region, recomputed for safety) and global checksum
+ if(tCur&&textEdited()){const err=packTexts(out);if(err)throw new Error(err)}
  let x=0;for(let i=0x134;i<=0x14C;i++)x=(x-out[i]-1)&255;out[0x14D]=x;
  let s=0;for(let i=0;i<out.length;i++)if(i!==0x14E&&i!==0x14F)s=(s+out[i])&0xFFFF;out[0x14E]=s>>8;out[0x14F]=s&255;return out}
-$("exportrom").onclick=()=>{download(buildRom(),romName+" (recolour).gbc","application/octet-stream");status("Exported ROM","ok")};
-$("exportips").onclick=()=>{const a=rom,b=buildRom(),recs=[];let i=0;
+$("exportrom").onclick=()=>{if(tPending!==null)commitText();let r;try{r=buildRom()}catch(x){status(x.message,"bad");return}download(r,romName+" (recolour).gbc","application/octet-stream");status("Exported ROM","ok")};
+$("exportips").onclick=()=>{if(tPending!==null)commitText();let b;try{b=buildRom()}catch(x){status(x.message,"bad");return}const a=rom,recs=[];let i=0;
  while(i<b.length){if(a[i]===b[i]){i++;continue}let j=i;while(j<b.length&&j-i<0xFFFF&&(a[j]!==b[j]||(j+1<b.length&&a[j+1]!==b[j+1])))j++;
   let st=i;if(st===0x454F46)st--;recs.push([st,b.slice(st,j)]);i=j}
  let size=8;for(const[,d]of recs)size+=5+d.length;const out=new Uint8Array(size);out.set([80,65,84,67,72]);let p=5;
@@ -518,8 +564,10 @@ function linkState(s){if(!offIndex)buildOffIndex();
    if(c2){if(r.src[i][1]===null)r.src[i][1]=c2[7][0];if(r.src[i][2]===null)r.src[i][2]=c2[7][0]+2}}}
  // convert ROM offsets to editor entries
  s.link=r.src.map(row=>row.map(o=>o===null?null:(offIndex.get(o)||null)));s.how=r.how}
-function colourFor(s,slot,k){const L=s.link[slot][k];if(!L)return s.raw[slot][k];const[n,kk]=L;
- if(sel&&sel.n===n&&sel.k===kk&&$("pop").style.display==="block")return popW;return cur[n][kk]}
+// Some colours are computed by the game from an editable one: t=1/2 = intro lightning (colour OR $1084 / $318C, IntroColorModifierTable)
+const LMOD=[0,0x1084,0x318C];
+function colourFor(s,slot,k){const L=s.link[slot][k];if(!L)return s.raw[slot][k];const[n,kk,tf]=L;
+ let w=(sel&&sel.n===n&&sel.k===kk&&$("pop").style.display==="block")?popW:cur[n][kk];return tf?w|LMOD[tf]:w}
 function drawScreen(){if(!$("prev").classList.contains("on")||$("scrpane").style.display==="none")return;
  const cv=$("scanvas"),ctx=cv.getContext("2d");const s=states[curState];
  $("scrhint").innerHTML=s?"":`Save a state in <b>SameBoy</b> (File ▸ Save State), then load the <code>.s0</code>–<code>.s9</code> file here. Take states with the <b>original</b> ROM for the most exact matching. Click any pixel to edit that colour.`;
@@ -569,7 +617,7 @@ async function loadPack(file){try{
    const[c,m,r]=meta;s={name:`${["Overworld","Indoor","Side-view"][c]} map ${m.toString(16).toUpperCase()} room ${r.toString(16).toUpperCase().padStart(2,"0")}`,io,vram,oam,bgp,obp,ram,hram};if(v4)s.tsrc=new Uint32Array(buf.slice(tsrcBase+i*3072,tsrcBase+(i+1)*3072));if(work&&gfxDirty)patchVram(s);rasterise(s)}
   if(v3){ // exact links recorded by replaying the capture on an ID-tagged ROM
    s.raw=[...Array(16)].map((_,q)=>[0,1,2,3].map(k=>{const b=q<8?s.bgp:s.obp,o=(q&7)*8+k*2;return b[o]|(b[o+1]<<8)}));
-   s.link=[];let lp=linkBase+i*192;for(let q=0;q<16;q++){const row=[];for(let k=0;k<4;k++){const n=d[lp]|(d[lp+1]<<8),kk=d[lp+2];lp+=3;row.push(n?[n-1,kk]:null)}s.link.push(row)}
+   s.link=[];let lp=linkBase+i*192;for(let q=0;q<16;q++){const row=[];for(let k=0;k<4;k++){const n=d[lp]|(d[lp+1]<<8),kk=d[lp+2];lp+=3;row.push(n?[n-1,kk&15,kk>>4]:null)}s.link.push(row)}
    s.how=["exact (traced)"];s.romTag="original ROM"}
   else linkState(s);
   this.cache.set(i,s);return s}};
@@ -577,7 +625,7 @@ async function loadPack(file){try{
  try{localStorage.setItem("ladx-map-last-group","0")}catch(e){}
  status(`Map pack loaded: ${hdr.screens.length} screens`,"ok");drawMap()}catch(x){status("Map pack: "+x.message,"bad")}}
 $("mapfile").onchange=e=>{if(e.target.files[0])loadPack(e.target.files[0]);e.target.value=""};
-function showMaps(on){if(on&&gfxOn)showGfx(false);mapOn=on;$("mapview").style.display=on?"flex":"none";$("list").style.display=on?"none":"block";$("content").classList.toggle("maps",on);
+function showMaps(on){if(on&&gfxOn)showGfx(false);if(on&&txtOn)showTxt(false);mapOn=on;$("mapview").style.display=on?"flex":"none";$("list").style.display=on?"none":"block";$("content").classList.toggle("maps",on);
  if(on){$("adj").style.display="none";$("drop").style.display="none"}$("mapsbtn").classList.toggle("primary",on);if(on)drawMap()}
 $("mapsbtn").onclick=()=>showMaps(!mapOn);
 ["mapgroup","mapzoom","mapspr","mapgrid"].forEach(id=>$(id).onchange=drawMap);
@@ -600,7 +648,7 @@ function mapHit(ev){if(!pack)return null;const g=pack.hdr.groups[+$("mapgroup").
  const cell=g.cells.find(c=>c[1]===gx&&c[2]===gy);if(!cell)return null;const s=pack.get(cell[0]),p=(Y%CH)*160+(X%160),spr=$("mapspr").checked;
  const sl=(spr?s.slot:s.bslot)[p],k=(spr?s.ci:s.bci)[p];return{s,sl,k,L:s.link[sl][k]}}
 $("mapcanvas").addEventListener("mousemove",ev=>{const h=mapHit(ev);if(!h){ev.target.title="";return}const w=colourFor(h.s,h.sl,h.k),e=h.L&&byN[h.L[0]];
- ev.target.title=`${h.s.name}\n${h.sl<8?"BG "+h.sl:"OBJ "+(h.sl-8)} colour ${h.k}: R ${w&31} G ${(w>>5)&31} B ${(w>>10)&31}\n${e?(e[5]||e[4])+" (row colour "+h.L[1]+")":"not linked to an editable palette"}`});
+ ev.target.title=`${h.s.name}\n${h.sl<8?"BG "+h.sl:"OBJ "+(h.sl-8)} colour ${h.k}: R ${w&31} G ${(w>>5)&31} B ${(w>>10)&31}\n${e?(e[5]||e[4])+" (row colour "+h.L[1]+")"+(h.L[2]?" — brightened by the lightning flash":""):"not linked to an editable palette"}`});
 $("mapcanvas").addEventListener("click",ev=>{const h=mapHit(ev);if(!h)return;if(!h.L){status("That colour isn't linked to an editable palette","warn");return}
  const anchor={getBoundingClientRect:()=>({left:ev.clientX,top:ev.clientY,bottom:ev.clientY+6})};openPop(anchor,h.L[0],h.L[1]);drawMap()});
 
@@ -671,7 +719,7 @@ $("gimport").onchange=async ev=>{const f=ev.target.files[0];ev.target.value="";i
  const ch=new Map();for(let t=0;t<tiles;t++){const[ox,oy]=tileXY(e,t);for(let y=0;y<8;y++)for(let x=0;x<8;x++){const i=((oy+y)*W+ox+x)*4,v=(d[i]<<16)|(d[i+1]<<8)|d[i+2];
   setPx(e,t,x,y,lut.has(v)?lut.get(v):near(d[i],d[i+1],d[i+2])[0],ch)}}
  pushUndo([...ch].map(([a,o])=>[-1,a,o]));drawGfx();gfxChanged();status(`Imported PNG: ${ch.size} bytes changed${exact?"":" (colours matched to nearest palette colour)"}`,"ok")};
-function showGfx(on){gfxOn=on;if(on&&mapOn)showMaps(false);$("gfxview").style.display=on?"flex":"none";if(on){$("list").style.display="none";$("adj").style.display="none"}else if(!mapOn)$("list").style.display="block";
+function showGfx(on){gfxOn=on;if(on&&mapOn)showMaps(false);if(on&&txtOn)showTxt(false);$("gfxview").style.display=on?"flex":"none";if(on){$("list").style.display="none";$("adj").style.display="none"}else if(!mapOn)$("list").style.display="block";
  $("content").classList.toggle("maps",on||mapOn);$("gfxbtn").classList.toggle("primary",on);if(on){fillGPal();drawGfx()}}
 $("gfxbtn").onclick=()=>showGfx(!gfxOn);
 // Previews follow graphics edits: VRAM tiles in save states / the map pack are traced back to their ROM tiles by content
@@ -689,6 +737,89 @@ function anyGfxEdits(){for(const e of GFX)for(const o of e[5])for(let i=0;i<e[4]
 let gfxDirty=false;
 function refreshGfxPreviews(){gfxDirty=true;for(const s of states){patchVram(s);rasterise(s)}
  if(pack){for(const[i,s]of pack.cache)if(!s.frame){patchVram(s);rasterise(s)}}drawScreen();drawMap()}
+
+// ---- Text (dialog) editor ----
+// Dialogs are read from the ROM's DialogPointerTable/DialogBankTable (bank $1C). When any text is edited, all dialogs are
+// re-wrapped exactly like the disassembly's dialog_string_wrapping macro and repacked into the original dialog areas plus
+// the unused bank $3E (this version masks dialog banks with $3F, so bank $3E is reachable).
+const SPEAKERS=["Tarin", "Marin", "Marin", "Marin", "Marin", "Marin", "Marin", "Narrator", "Narrator", "Witch", "Tarin", "Tarin", "Witch", "Tarin", "Narrator", "Narrator", "Tarin", "Tarin", "Talking Tree", "Narrator", "Marin", "Marin", "Marin", "Crazy Tracy", "Crazy Tracy", "Crazy Tracy", "Crazy Tracy", "Crazy Tracy", "Crazy Tracy", "Crazy Tracy", "Crazy Tracy", "Narrator", "Mutt", "Tarin", "BowWow", "ChowChow", "Great Fairy", "Grim Creeper (D7 Mini-Boss)", "Grim Creeper (D7 Mini-Boss)", "Papahl", "Marin", "Shopkeeper", "Narrator", "Shopkeeper, Link", "Shopkeeper, Link", "Shopkeeper, Link", "Shopkeeper", "Shopkeeper", "Shopkeeper, Link", "Shopkeeper, Link", "Shopkeeper, Link", "Shopkeeper, Link", "Shopkeeper", "Shopkeeper", "Narrator", "Shopkeeper", "Shopkeeper", "Narrator", "Trendy Gamester", "Trendy Gamester", "Trendy Gamester", "Narrator", "Trendy Gamester, Link", "Trendy Gamester", "Trendy Gamester", "Narrator", "Trendy Gamester, probably", "Ghost", "Narrator", "Fisherman", "Fisherman", "Fisherman", "Fisherman, Link", "Fisherman, Link", "Fisherman, Link", "Fisherman, Link", "Fisherman, Link", "Fisherman, Link", "Fisherman", "Narrator", "Narrator", "Narrator", "Genie (D2 Nightmare)", "Genie (D2 Nightmare)", "Tarin", "Tarin", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Map", "Signpost", "Map", "Map", "Map", "Map", "Map", "Map", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Marin", "Narrator", "Narrator", "Desert skull", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Hippo", "Moldorm (D1 Nightmare)", "Slime Eyes (D3 Nightmare)", "Angler Fish (D4 Nightmare)", "Slime Eel (D5 Nightmare)", "Genie (D2 Nightmare)", "Slime Eel (D5 Nightmare)", "Facade (D6 Nightmare)", "Facade (D6 Nightmare)", "Grim Creeper (D7 Nightmare)", "Grim Creeper (D7 Nightmare)", "Grim Creeper (D7 Nightmare)", "Hot Head (D8 Nightmare)", "Hot Head (D8 Nightmare)", "Hot Head (D8 Nightmare)", "Owl", "Owl", "Owl", "Owl", "Owl", "Owl", "Owl", "Owl", "Owl", "Owl", "Owl", "Owl", "Owl", "Owl", "Owl", "Owl", "Owl", "Owl", "Wind Fish", "Wind Fish", "Wind Fish", "Map, probably", "Map, probably", "Map, probably", "Owl", "Owl", "Schule Donavitch", "Owl", "Lanmola", "Mamu", "Mamu", "Mamu", "Mamu", "Narrator", "Mamu", "Li'l Devil", "Li'l Devil", "Li'l Devil", "Li'l Devil", "Li'l Devil", "Narrator", "Southern Face Shrine mural", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Raft Guy", "Raft Guy", "Signpost, probably", "Signpost, probably", "Signpost, probably", "Nightmare (final boss)", "Nightmare (final boss)", "Marin", "Marin", "Trendy Gamester", "Hippo", "idk", "Narrator", "Narrator", "Witch", "Tarin", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Photographer", "Photographer", "Photographer, probably", "Photographer", "Photographer", "Photographer", "Photographer", "Photographer", "Narrator", "Master Stalfos (D5 Mini-Boss)", "Master Stalfos (D5 Mini-Boss)", "Master Stalfos (D5 Mini-Boss)", "Master Stalfos (D5 Mini-Boss)", "BowWow", "Narrator", "idk", "Kid", "Kid", "Kid", "Kid", "Kid", "Kid", "Kid", "Kid", "Kid", "Kid", "Kid", "Kid, probably", "Fisherman", "Fisherman", "Zora", "Mamasha", "Mamasha, probably", "Narrator", "Mamasha", "Mamasha", "Mamasha", "Richard", "Photographer", "Madam MeowMeow", "Madam MeowMeow", "Madam MeowMeow", "Madam MeowMeow", "Weird Mr. Write", "Weird Mr. Write", "Weird Mr. Write", "Narrator", "Weird Mr. Write", "Weird Mr. Write", "Weird Mr. Write", "Richard", "Richard", "Richard", "Richard", "Richard", "Richard", "Ulrira, Narrator", "Ulrira", "Ulrira", "Ulrira", "Ulrira", "Ulrira", "Ulrira", "Ulrira", "Ulrira", "Ulrira", "Ulrira", "Ulrira", "Ulrira", "Ulrira", "Ulrira", "Ulrira", "Wind Fish, probably", "Wind Fish, probably", "Wind Fish, probably", "Wind Fish, probably", "Wind Fish, probably", "Wind Fish, probably", "Wind Fish, probably", "Wind Fish, probably", "Grandma Yahoo", "Grandma Yahoo", "Grandma Yahoo", "Grandma Yahoo", "Grandma Yahoo", "Grandma Yahoo", "Narrator", "Grandma Yahoo", "Kiki", "Kiki", "Kiki", "Kiki", "Narrator", "Kiki, Narrator, Link", "Christine", "Christine", "Christine", "Christine", "Narrator", "Christine", "Narrator", "Narrator", "Ulrira", "Kid, probably", "Papahl", "Papahl", "Papahl", "Papahl", "Narrator", "Papahl", "Papahl, probably", "Papahl", "Grandma Yahoo", "Spirit of the Mansion", "Narrator", "Spirit of the Mansion", "idk, might be unused?", "Map, probably", "Witch", "Genie (D2 Nightmare)", "CiaoCiao", "CiaoCiao, Link", "Narrator", "CiaoCiao", "CiaoCiao", "Manbo", "Manbo", "Manbo", "Narrator", "Manbo", "Manbo", "Henhouse Keeper", "Henhouse Keeper", "Henhouse Keeper", "Weathervane", "Schule Donavitch", "Moblin", "Moblin Chief", "Marin", "Marin", "Marin", "Marin", "Mutt, narrator", "Marin", "Marin", "Marin", "Crazy Tracy", "Schule Donavitch", "Mermaid Statue, Narrator", "Signpost and maybe ; Map", "Signpost, probably", "Signpost", "Signpost", "Signpost, probably", "Signpost", "Signpost and maybe ; Map", "Signpost", "Signpost", "Signpost", "Signpost and maybe ; Map", "Signpost", "Signpost", "Signpost", "Signpost", "Signpost", "Signpost", "Signpost", "Signpost", "Signpost", "Signpost", "Signpost", "Signpost", "Signpost", "Signpost", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Tarin", "Tarin", "Narrator", "Marin, probably", "Signpost", "Tarin", "Tarin", "Sale", "Sale", "Sale", "Sale", "Sale", "Narrator", "Sale", "Sale", "Chef Bear", "Chef Bear", "Narrator", "Chef Bear, probably", "Chef Bear", "Chef Bear", "Chef Bear", "Marin", "Marin", "Marin", "Marin", "Marin", "Marin, Link", "Marin", "Marin", "Tarin", "Marin", "idk", "Walrus", "Marin, Link", "Marin", "Marin", "Marin", "Marin, probably", "idk", "Fisherman", "Fisherman", "Fisherman", "Fisherman", "Fisherman", "Narrator", "Fisherman", "Mamasha", "Secret Zora", "Mermaid", "Mermaid", "Mermaid", "Mermaid", "Mermaid", "Narrator", "Photographer", "Mermaid", "Photographer", "Signpost maybe, and ; Map maybe", "Signpost", "Signpost", "Signpost", "Bucket Mouse", "Fisherman, Link", "Fisherman, Link", "Book, Narrator", "Book", "Book, Narrator", "Book", "Book, Narrator", "Book, Narrator", "Book, Narrator", "Book", "Book, Narrator", "Book", "Book, Narrator", "Book", "Book, Narrator", "Book, Narrator", "Book, Narrator", "Ghost", "Ghost", "Ghost", "Ghost", "Ghost", "Ghost", "Ghost", "Ghost", "Book, Narrator", "Book, Narrator", "Book, Narrator", "Book, Narrator", "Marin", "Marin", "Marin", "Marin", "Kid", "Kid", "Secret Goriya", "Secret Goriya", "Secret Goriya", "Narrator", "Secret Goriya, Link", "Narrator", "Secret Goriya", "Ulrira", "Ulrira", "Ulrira", "Photo Album, Narrator", "Narrator", "Signpost, probably", "Photographer", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Narrator", "Marin", "Marin", "Marin", "Marin", "Marin", "Marin", "Tarin", "Richard", "Tarin", "Photographer, probably", "Photographer, probably", "Ulrira", "Ulrira", "Ulrira", "Ulrira", "Ulrira", "Ulrira", "Ulrira", "Ulrira", "Ulrira", "idk", "idk", "idk", "idk", "idk", "idk", "idk", "idk", "Rabbit", "idk", "idk", "idk", "Marin", "Marin", "Marin", "Marin", "Photographer, maybe", "Narrator", "Narrator", "Fairy Queen (Color Dungeon)", "Fairy Queen (Color Dungeon), Link", "Dion (Color Dungeon)", "Gar (Color Dungeon)", "Color Guard (Color Dungeon)", "idk", "Color Guard (Color Dungeon)", "idk (Color Dungeon)", "idk", "idk", "Narrator", "Book, Narrator", "Fairy Queen (Color Dungeon)", "idk", "idk", "Great Fairy", "idk (Color Dungeon)", "idk (Color Dungeon)", "idk (Color Dungeon)", "idk (Color Dungeon)", "Photographer", "BowWow", "Photographer", "BowWow", "Photographer", "BowWow", "Marin", "Marin", "Marin", "Marin", "Marin, probably", "Marin, probably", "Cukeman", "Cukeman", "Cukeman", "Cukeman", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Owl Statue", "Photographer, Link", "Photographer, Link", "Photographer", "Photographer", "Photographer", "Photographer", "Photographer", "Photographer", "Photographer", "Photographer", "Photographer", "Photographer", "Photographer", "Photographer", "Photographer", "Photographer", "Photographer", "Photographer", "Photographer", "Photographer", "Photographer", "Photographer", "Photographer", "Photographer", "Photographer, probably", "Photographer, probably", "Photographer, probably", "Photographer, probably"],CHARMAP={" ": 32, "!": 33, "\"": 34, "#": 35, "&": 38, "(": 40, ")": 41, ",": 44, "-": 45, ".": 46, "0": 48, "1": 49, "2": 50, "3": 51, "4": 52, "5": 53, "6": 54, "7": 55, "8": 56, "9": 57, ":": 58, ";": 59, "?": 63, "A": 65, "B": 66, "C": 67, "D": 68, "E": 69, "F": 70, "G": 71, "H": 72, "I": 73, "J": 74, "K": 75, "L": 76, "M": 77, "N": 78, "O": 79, "P": 80, "Q": 81, "R": 82, "S": 83, "T": 84, "U": 85, "V": 86, "W": 87, "X": 88, "Y": 89, "Z": 90, "'": 94, "a": 97, "b": 98, "c": 99, "d": 100, "e": 101, "f": 102, "g": 103, "h": 104, "i": 105, "j": 106, "k": 107, "l": 108, "m": 109, "n": 110, "o": 111, "p": 112, "q": 113, "r": 114, "s": 115, "t": 116, "u": 117, "v": 118, "w": 119, "x": 120, "y": 121, "z": 122, "+": 127, "Á": 128, "É": 129, "Í": 130, "Ó": 131, "Ú": 132, "Ü": 133, "Ñ": 134, "Ç": 136, "á": 137, "é": 138, "í": 139, "ó": 140, "ú": 141, "ü": 142, "ñ": 143, "à": 144, "è": 145, "ì": 146, "ò": 147, "ù": 148, "ä": 149, "ë": 150, "ï": 151, "ö": 152, "¡": 154, "¿": 155, "`": 156, "â": 176, "ê": 177, "î": 178, "ô": 179, "û": 180, "<flower>": 217, "<footprint>": 218, "<skull>": 220, "<link>": 221, "<marin>": 222, "<tarin>": 223, "<yoshi>": 224, "<ribbon>": 225, "<dogfood>": 226, "<bananas>": 227, "<stick>": 228, "<honeycomb>": 229, "<pineapple>": 230, "<flower2>": 231, "<broom>": 232, "<fishhook>": 233, "<bra>": 234, "<scale>": 235, "<glass>": 236, "<letter>": 237, "<dpad>": 238, "<up>": 240, "<down>": 241, "<left>": 242, "<right>": 243, "/": 253, "<ask>": 254, "@": 255};
+const TX={PT:0x70001,BT:0x70741,N:688,C2T:0x70641,REGIONS:[[0x09,0x668E],[0x14,0x5931],[0x16,0x5701],[0x1C,0x4B2A],[0x1D,0x4000],[0x3E,0x4000]]};
+const CODE2TOK={};for(const[k,v]of Object.entries(CHARMAP))if(!(v in CODE2TOK))CODE2TOK[v]=k;
+let tOrig=null,tCur=null,tBank=null,tSel=0,txtOn=false,tPending=null,tTimer=null;
+function tokenize(s){const out=[],err=[];let i=0;
+ while(i<s.length){if(s[i]==="<"){const j=s.indexOf(">",i);if(j>0){const tk=s.slice(i,j+1);if(tk in CHARMAP){out.push(tk);i=j+1;continue}
+    if(/^<[0-9a-fA-F]{2}>$/.test(tk)){out.push(tk.toLowerCase());i=j+1;continue}}}
+  const ch=s[i];if(ch==="@")err.push("“@” can't be used — it ends the dialog");else if(!(ch in CHARMAP))err.push(`“${ch}” isn't in the game's font`);out.push(ch);i++}return{out,err}}
+const tokCode=tk=>tk in CHARMAP?CHARMAP[tk]:parseInt(tk.slice(1,3),16);
+function wrapTokens(paras){const out=[];let ls=0,first=true;
+ for(const para of paras){let p=para.slice();
+  for(;;){const pad=first?0:(16-((out.length-ls)%16))%16;for(let q=0;q<pad;q++)out.push(" ");first=false;ls=out.length;
+   if(p.length<=16){out.push(...p);break}
+   let len=null,cut=null;const line=[];for(let i=0;i<16;i++){const u=p[i];if(u===" "){len=line.length;cut=len+1}else if(u==="-"){len=line.length+1;cut=len}line.push(u)}
+   if(p[16]===" "){len=line.length;cut=len+1}
+   if(len===null)throw new Error(`A line has no place to break: “${line.join("")}…” (16 characters max per line)`);
+   out.push(...line.slice(0,len));p=p.slice(cut)}}return out}
+function unwrapTokens(t){const lines=[];for(let i=0;i<t.length;i+=16)lines.push(t.slice(i,i+16));const paras=[];let cur=null;
+ lines.forEach((L,li)=>{let Ls=L.slice();if(li<lines.length-1)while(Ls.length&&Ls[Ls.length-1]===" ")Ls.pop();const need=16*li+Ls.length;
+  if(cur!==null){let done=false;for(const cand of[[...cur," ",...Ls],[...cur,...Ls]]){let w;try{w=wrapTokens([...paras,cand])}catch(e){continue}
+    if(w.length===need&&w.every((x,q)=>x===t[q])){cur=cand;done=true;break}}if(!done){paras.push(cur);cur=Ls}}else cur=Ls});
+ if(cur!==null)paras.push(cur);
+ let ok=false;try{const w=wrapTokens(paras);ok=w.length===t.length&&w.every((x,q)=>x===t[q])}catch(e){}
+ return ok?paras:lines}  // fallback: exact original lines as forced breaks
+function loadTexts(){tOrig=[];tBank=[];
+ for(let i=0;i<TX.N;i++){const p=rom[TX.PT+2*i]|(rom[TX.PT+2*i+1]<<8),bb=rom[TX.BT+i],off=(bb&0x3F)*0x4000+(p-0x4000);tBank.push(bb);
+  const toks=[];for(let a=off;a<rom.length&&rom[a]!==0xFF&&toks.length<4096;a++)toks.push(CODE2TOK[rom[a]]??"<"+rom[a].toString(16).padStart(2,"0")+">");
+  tOrig.push(unwrapTokens(toks).map(p=>p.join("")).join("\n"))}tCur=tOrig.slice()}
+function encodeText(s){const paras=s.split("\n").map(p=>tokenize(p).out);return[...wrapTokens(paras).map(tokCode),0xFF]}
+function textErrors(s){const e=new Set();for(const p of s.split("\n"))tokenize(p).err.forEach(x=>e.add(x));try{wrapTokens(s.split("\n").map(p=>tokenize(p).out))}catch(x){e.add(x.message)}return[...e]}
+const textEdited=()=>tCur&&tCur.some((s,i)=>s!==tOrig[i]);
+function packTexts(out){ // returns null or error string
+ const caps=TX.REGIONS.map(([b,s])=>({b,s,ptr:s}));const placed=new Map();const enc=[];
+ for(let i=0;i<TX.N;i++){try{enc.push(encodeText(tCur[i]))}catch(x){return`Dialog ${i.toString(16).toUpperCase()}: ${x.message}`}}
+ for(const r of caps){const base=r.b*0x4000;out.fill(0,base+(r.s-0x4000),base+0x4000)}
+ for(let i=0;i<TX.N;i++){const bytes=enc[i],key=bytes.join(",");let loc=placed.get(key);
+  if(!loc){const r=caps.find(r=>0x8000-r.ptr>=bytes.length);if(!r)return`Not enough room for all the text (ran out at dialog ${i.toString(16).toUpperCase()}). Shorten some edits.`;
+   loc=[r.b,r.ptr];out.set(bytes,r.b*0x4000+(r.ptr-0x4000));r.ptr+=bytes.length;placed.set(key,loc)}
+  out[TX.PT+2*i]=loc[1]&255;out[TX.PT+2*i+1]=loc[1]>>8;out[TX.BT+i]=(tBank[i]&0x80)|loc[0]}return null}
+function textUsage(){let used=0;const seen=new Set();for(let i=0;i<TX.N;i++){let b;try{b=encodeText(tCur[i])}catch(e){continue}const k=b.join(",");if(!seen.has(k)){seen.add(k);used+=b.length}}
+ const cap=TX.REGIONS.reduce((a,[,s])=>a+(0x8000-s),0);return{used,cap}}
+function renderTList(){const q=$("tsearch").value.trim().toLowerCase(),eo=$("tedited").checked;let h="";
+ for(let i=0;i<TX.N;i++){const ed=tCur[i]!==tOrig[i];if(eo&&!ed)continue;const id=i.toString(16).toUpperCase().padStart(3,"0");
+  if(q&&!(tCur[i].toLowerCase().includes(q)||(SPEAKERS[i]||"").toLowerCase().includes(q)||id.toLowerCase().includes(q)))continue;
+  h+=`<div class="trow${i===tSel?" on":""}" data-i="${i}"><b>${id}</b><span class="sp">${esc(SPEAKERS[i]||"—")}</span>${ed?'<span class="ed">✎ edited</span>':""}<div class="tx">${esc(tCur[i].replace(/\n/g," ⏎ ").slice(0,90))}</div></div>`}
+ $("tlist").innerHTML=h||'<p class="hint" style="margin:10px">Nothing matches.</p>'}
+$("tlist").addEventListener("click",ev=>{const r=ev.target.closest(".trow");if(!r)return;commitText();tSel=+r.dataset.i;renderTList();renderTEditor()});
+$("tsearch").oninput=renderTList;$("tedited").onchange=renderTList;
+function renderTEditor(keepText){const i=tSel,id=i.toString(16).toUpperCase().padStart(3,"0");
+ $("thead").innerHTML=`<b>Dialog ${id}</b> · <span style="color:var(--acc)">${esc(SPEAKERS[i]||"unknown speaker")}</span>${tCur[i]!==tOrig[i]?' · <span style="color:var(--warn)">edited</span>':""}`;
+ if(!keepText)$("ttext").value=tCur[i];$("trevert").disabled=tCur[i]===tOrig[i];updateTPreview()}
+function updateTPreview(){const s=$("ttext").value,errs=textErrors(s);$("terr").className=errs.length?"hint bad":"hint";
+ $("terr").textContent=errs.length?"⚠ "+errs.join(" · "):"Each line in the box above is a forced line break; text wraps automatically at 16 characters like the original game.";
+ const{used,cap}=textUsage();$("tmeter").innerHTML=`Text space used: ${used.toLocaleString()} / ${cap.toLocaleString()} bytes (${(used/cap*100).toFixed(1)}%)<div class="bar"><i style="width:${Math.min(100,used/cap*100)}%"></i></div>`;
+ const P=$("tprev");P.innerHTML="";if(errs.length)return;
+ let toks;try{toks=wrapTokens(s.split("\n").map(p=>tokenize(p).out))}catch(e){return}
+ // the game shows two 16-character lines per text box
+ const name=($("tname").value||"").toUpperCase(),font=GFX.find(e=>e[0]==="fonts"&&e[1]==="font"),fo=font?font[5][0]:0;let ni=0;
+ const lines=[];for(let q=0;q<toks.length;q+=16)lines.push(toks.slice(q,q+16));
+ for(let b=0;b<lines.length;b+=2){const cv=document.createElement("canvas"),W=16*8+16,H=2*16+12,Z=3;cv.width=W*Z;cv.height=H*Z;
+  const ctx=cv.getContext("2d"),img=ctx.createImageData(W,H),d=img.data;
+  for(let p=0;p<W*H;p++){const x=p%W,y=Math.floor(p/W),edge=x<2||y<2||x>=W-2||y>=H-2;d[p*4]=edge?200:14;d[p*4+1]=edge?200:14;d[p*4+2]=edge?210:30;d[p*4+3]=255}
+  for(let l=0;l<2;l++){const L=lines[b+l]||[];L.forEach((tk,c)=>{if(tk==="<ask>")return;let code=tokCode(tk);if(tk==="#"){const ch=name[ni++]||" ";code=CHARMAP[ch]??0x20}
+    const tile=rom[TX.C2T+code];if(!tile||code===0x20)return;const ox=8+c*8,oy=6+l*16+4;
+    for(let y=0;y<8;y++){const lo=work[fo+tile*16+y*2],hi=work[fo+tile*16+y*2+1];for(let x=0;x<8;x++){const ci=((lo>>(7-x))&1)|(((hi>>(7-x))&1)<<1);if(ci===3)continue; // font: 3 = background, 0 = letter
+     const p=((oy+y)*W+ox+x)*4,v=ci===0?250:ci===1?185:120;d[p]=v;d[p+1]=v;d[p+2]=v}}})}
+  const tmp=document.createElement("canvas");tmp.width=W;tmp.height=H;tmp.getContext("2d").putImageData(img,0,0);ctx.imageSmoothingEnabled=false;ctx.drawImage(tmp,0,0,W*Z,H*Z);
+  cv.style.width=W*2+"px";cv.style.height=H*2+"px";cv.title=`Box ${b/2+1}`;P.appendChild(cv)}}
+function commitText(){clearTimeout(tTimer);if(tPending===null)return;const i=tSel,old=tPending;tPending=null;if(tCur[i]!==old)pushUndo([[-2,i,old]]);renderTList();renderTEditor(true)}
+$("ttext").addEventListener("input",()=>{if(tPending===null)tPending=tCur[tSel];tCur[tSel]=$("ttext").value;updateTPreview();clearTimeout(tTimer);tTimer=setTimeout(commitText,700)});
+$("ttext").addEventListener("blur",commitText);
+$("tname").oninput=updateTPreview;
+document.querySelectorAll(".ttools [data-tok]").forEach(b=>b.onclick=()=>{const ta=$("ttext"),a=ta.selectionStart,z=ta.selectionEnd;ta.setRangeText(b.dataset.tok,a,z,"end");ta.focus();ta.dispatchEvent(new Event("input"))});
+$("trevert").onclick=()=>{const i=tSel;if(tCur[i]===tOrig[i])return;pushUndo([[-2,i,tCur[i]]]);tCur[i]=tOrig[i];renderTList();renderTEditor()};
+function showTxt(on){txtOn=on;if(on){if(mapOn)showMaps(false);if(gfxOn)showGfx(false)}$("txtview").style.display=on?"flex":"none";
+ if(on){$("list").style.display="none";$("adj").style.display="none"}else if(!mapOn&&!gfxOn)$("list").style.display="block";
+ $("content").classList.toggle("maps",on||mapOn||gfxOn);$("txtbtn").classList.toggle("primary",on);if(on){renderTList();renderTEditor()}else commitText()}
+$("txtbtn").onclick=()=>showTxt(!txtOn);
 renderCats();
 </script>
 </body>

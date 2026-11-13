@@ -1,17 +1,18 @@
 # LADX Palette Editor
 
-A browser-based colour palette and graphics editor for **The Legend of Zelda: Link's Awakening DX** (Game Boy Color, English v1.2).
+A browser-based colour palette, graphics and text editor for **The Legend of Zelda: Link's Awakening DX** (Game Boy Color, English v1.2).
 
 **Open the editor:** this repository's GitHub Pages site (index.html).
 
 ## What it does
 - Edit all 1,571 colour palettes the game uses (Link, NPCs, enemies, overworld, interiors, dungeons, HUD, intro, ending…) with Final Fantasy-style R/G/B sliders (0–31, the GBC's native scale)
 - **Tile & sprite editor** for all 142 graphics sheets (characters, items, overworld/interior/dungeon tiles, menus, fonts, intro, ending, photos): pencil, tile fill, eyedropper, tile copy/paste, PNG export/import
+- **Text editor** for all 688 dialogs: automatic 16-character word wrap matching the original, live text-box preview in the game's font, and automatic repacking so text can be longer than the original
 - Sprite preview, live while you edit
 - Screen preview from SameBoy save states (BESS format) — click any pixel to edit that colour
 - Map viewer for a map pack (see below)
 - Colour grading (hue / saturation / lightness / contrast / tint), "replace every identical colour", undo/redo for colours and graphics
-- Export a patched `.gbc` or an `.ips` patch; save/load project files (palette and graphics edits)
+- Export a patched `.gbc` or an `.ips` patch; save/load project files (palette, graphics and text edits)
 
 Everything runs locally in your browser. **No ROM or game data is included or uploaded** — you load your own legally dumped ROM, and it never leaves your computer.
 
